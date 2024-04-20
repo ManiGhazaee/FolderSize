@@ -2,13 +2,15 @@ import { open } from "@tauri-apps/api/dialog";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useState } from "react";
-import { children, convertSize, fileName, Tree } from "./lib";
+import { convertSize, fileName } from "./lib";
 import { window as taruiWindow } from "@tauri-apps/api";
+
+type Entries = { root: string; entries: [number, string, boolean][] };
 
 function App() {
     const [dir, setDir] = useState<string | null>(null);
-    const [dirSize, setDirSize] = useState<string | null>(null);
-    const [tree, setTree] = useState<Tree | null>(null);
+    const [dirSize, setDirSize] = useState<number | null>(null);
+    const [entires, setEntries] = useState<Entries | null>(null);
 
     async function selectDir() {
         let selected = (await open({
@@ -21,19 +23,24 @@ function App() {
             return;
         }
         if (selected !== null) {
-            setDir(selected);
-            let size: string = await invoke("folder_size", { window: taruiWindow, path: selected });
-            setDirSize(size);
+            folderSize(selected);
         }
     }
 
+    async function folderSize(path: string) {
+        setDir(path);
+        let size: number = await invoke("folder_size", { window: taruiWindow, path });
+        setDirSize(size);
+    }
+
     useEffect(() => {
-        listen("folder-size", (ev) => {
-            let tree = ev.payload as Tree;
-            setTree(tree);
+        listen("entries", (ev) => {
+            let e = ev.payload as Entries;
+            e.entries.sort((a, b) => b[0] - a[0]);
+            setEntries(e);
         });
-        listen("file-size", (ev) => {
-            console.log(ev.payload);
+        listen("sum-size", (ev) => {
+            setDirSize(ev.payload as number);
         });
     }, []);
 
@@ -41,35 +48,29 @@ function App() {
         <div>
             <button onClick={selectDir}>Select</button>
             <div>{dir?.toString()}</div>
-            <div>{dirSize?.toString()}</div>
-            {tree !== null && (
+            <div>{dirSize !== null && convertSize(dirSize)}</div>
+            {entires !== null && (
                 <>
                     <div
                         onClick={() => {
-                            setTree((prev) => {
-                                let clone = { ...prev! };
-                                let parent = tree.vals[tree.current].parent;
-                                if (parent !== null) {
-                                    clone.current = parent;
-                                }
-                                return clone;
-                            });
+                            if (entires.root === "") {
+                                return;
+                            }
+                            folderSize(entires.root);
                         }}
                     >
                         ..
                     </div>
-                    {children(tree).map((node) => (
+                    {entires.entries.map((node) => (
                         <div
                             onClick={() => {
-                                setTree((prev) => {
-                                    let clone = { ...prev! };
-                                    clone.current = node[0];
-                                    return clone;
-                                });
+                                if (node[2]) {
+                                    return;
+                                }
+                                folderSize(node[1]);
                             }}
                         >
-                            {fileName(node[1].val[0])} - {convertSize(node[1].val[1])} -{" "}
-                            {node[1].val[2] ? "FILE" : "FOLDER"}
+                            {node[2] ? "FILE" : "FOLDER"} - {convertSize(node[0])} - {fileName(node[1])}
                         </div>
                     ))}
                 </>

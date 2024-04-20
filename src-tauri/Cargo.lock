@@ -706,6 +706,7 @@ name = "file_size"
 version = "0.0.0"
 dependencies = [
  "jwalk",
+ "lazy_static",
  "serde",
  "serde_json",
  "tauri",

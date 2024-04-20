@@ -1,21 +1,3 @@
-export interface Tree {
-    vals: TNode[];
-    current: number;
-}
-export interface TNode {
-    val: [string, number, boolean];
-    children: number[];
-    parent: number | null;
-}
-
-export function children(tree: Tree): [number, TNode][] {
-    let children = [];
-    for (let i of tree.vals[tree.current].children) {
-        children.push([i, tree.vals[i]] as [number, TNode]);
-    }
-    return children;
-}
-
 export function convertSize(size: number): string {
     let string = size.toString();
     if (range(0, 4).contains(string.length)) {

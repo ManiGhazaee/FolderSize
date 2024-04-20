@@ -1,84 +1,82 @@
-#[allow(invalid_reference_casting)]
-pub mod index {
-    use std::collections::HashMap;
+use jwalk::rayon::iter::{ParallelBridge, ParallelIterator};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    fs::read_dir,
+    path::{Path, PathBuf},
+    sync::{Arc, RwLock},
+    time::{Duration, Instant},
+};
 
-    use serde::{Deserialize, Serialize};
+#[macro_use]
+extern crate lazy_static;
 
-    type Val = (String, u64, bool);
+lazy_static! {
+    pub static ref CACHE: Arc<RwLock<HashMap<PathBuf, u64>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+}
 
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub(super) struct Node {
-        pub(super) val: Val,
-        pub(super) parent: Option<usize>,
-        pub(super) children: Vec<usize>,
+pub struct Timer {
+    dur: Duration,
+    last: Instant,
+    left: Duration,
+}
+
+impl Timer {
+    pub fn new(duration: Duration) -> Self {
+        Self {
+            dur: duration,
+            last: Instant::now(),
+            left: duration,
+        }
     }
-
-    impl Node {
-        pub(super) fn new(val: Val, parent: Option<usize>) -> Self {
-            Self {
-                val,
-                parent,
-                children: Vec::new(),
-            }
+    pub fn tick(&mut self) -> bool {
+        let now = Instant::now();
+        let elpsd = now - self.last;
+        self.last = now;
+        if self.left <= elpsd {
+            self.left = self.dur - (Self::rem(elpsd, self.dur));
+            true
+        } else {
+            self.left -= elpsd;
+            false
         }
     }
-
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct Tree {
-        pub(super) map: HashMap<String, usize>,
-        pub(super) vals: Vec<Node>,
-        pub(super) current: usize,
+    fn rem(mut d1: Duration, d2: Duration) -> Duration {
+        while d1 >= d2 {
+            d1 -= d2;
+        }
+        d1
     }
+}
 
-    impl Tree {
-        pub fn new(root_val: Val) -> Self {
-            let mut ret = Self {
-                map: HashMap::new(),
-                vals: Vec::new(),
-                current: 0,
-            };
-            ret.vals.push(Node::new(root_val.clone(), None));
-            ret.map.insert(root_val.0, 0);
-            ret
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Entries {
+    root: PathBuf,
+    entries: Vec<(u64, PathBuf, bool)>,
+}
+
+impl Entries {
+    pub fn new(root: &PathBuf, map: &CACHE) -> Self {
+        let entries = match read_dir(root) {
+            Ok(rd) => rd
+                .into_iter()
+                .par_bridge()
+                .map(|entry| {
+                    let path = entry.unwrap().path();
+                    let is_file = path.is_file();
+                    (*map.read().unwrap().get(&path).unwrap(), path, is_file)
+                })
+                .collect(),
+            _ => Default::default(),
+        };
+        let mut parent = root.parent().unwrap_or(&Path::new("")).to_path_buf();
+        if !CACHE.read().unwrap().contains_key(&parent) {
+            parent = Path::new("").to_path_buf();
         }
-        pub fn current(&self) -> &Val {
-            self.val(self.current)
-        }
-        pub fn current_mut(&mut self) -> &mut Val {
-            self.val_mut(self.current)
-        }
-        #[inline]
-        fn val(&self, index: usize) -> &Val {
-            unsafe { &self.vals.get_unchecked(index).val }
-        }
-        #[inline]
-        fn val_mut(&mut self, index: usize) -> &mut Val {
-            unsafe { &mut self.vals.get_unchecked_mut(index).val }
-        }
-        pub fn push_child(&mut self, val: Val) {
-            self.vals.push(Node::new(val.clone(), Some(self.current)));
-            let len = self.vals.len();
-            self.vals[self.current].children.push(len - 1);
-            self.map.insert(val.0, len - 1);
-        }
-        pub fn is_root(&self) -> bool {
-            self.vals[self.current].parent.is_none()
-        }
-        pub fn set_current_to_parent(&mut self) {
-            if self.is_root() {
-                return;
-            }
-            self.current = self.vals[self.current].parent.unwrap();
-        }
-        pub fn set_current_to_root(&mut self) {
-            if self.vals.is_empty() {
-                return;
-            }
-            self.current = 0;
-        }
-        pub fn set_current_by_val(&mut self, val: &String) {
-            let i = self.map.get(val).unwrap();
-            self.current = *i;
+        Self {
+            root: parent,
+            entries,
         }
     }
 }

@@ -1,92 +1,84 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(dead_code)]
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+use std::{
+    fs::read_dir,
+    os::windows::fs::MetadataExt,
+    path::Path,
+    sync::{Arc, Mutex, RwLock},
+    time::{Duration, Instant},
+};
 
-use std::{fs::read_dir, mem, os::windows::fs::MetadataExt, path::Path, time::Instant};
-
-use file_size::index::Tree;
+use file_size::{Entries, Timer, CACHE};
 use jwalk::rayon::iter::{ParallelBridge, ParallelIterator};
-use tauri::{Manager, Runtime};
-
-static mut TREE: Option<Tree> = None;
+use tauri::Runtime;
 
 #[tauri::command]
-async fn folder_size<R: Runtime>(window: tauri::Window<R>, path: String) -> String {
+async fn folder_size<R: Runtime>(window: tauri::Window<R>, path: String) -> u64 {
     let inst = Instant::now();
-    let path_str = Path::new(&path).to_string_lossy().to_string();
-    let mut tree = Tree::new((path_str.clone(), 0, false));
-    let size = recurse_size_tree(&window, Path::new(&path), &mut tree);
-    dbg!(inst.elapsed());
-    unsafe {
-        tree.set_current_to_root();
-        *tree.current_mut() = (path_str, size, false);
-        let _ = mem::replace(&mut TREE, Some(tree));
-        if let Some(tree) = &TREE {
-            window.emit_all("folder-size", tree).unwrap();
-        }
-    }
+    let path_str = Path::new(&path).to_path_buf();
+    let timer = Arc::new(Mutex::new(Timer::new(Duration::from_millis(400))));
+    let sum_size: Arc<RwLock<u64>> = Arc::new(RwLock::new(0));
+    let window = Arc::new(window);
+    let size = recurse_size_map(Arc::clone(&window), &path_str, &CACHE, sum_size, timer);
 
-    convert_size(size)
+    let entries = Entries::new(&path_str, &CACHE);
+
+    window.emit("entries", entries).unwrap();
+
+    dbg!(inst.elapsed());
+
+    size
 }
 
-fn recurse_size_tree<'a, R: Runtime>(
-    app: &tauri::Window<R>,
+fn recurse_size_map<'a, R: Runtime>(
+    window: Arc<tauri::Window<R>>,
     path: &Path,
-    tree: &'a mut Tree,
+    map: &CACHE,
+    sum_size: Arc<RwLock<u64>>,
+    timer: Arc<Mutex<Timer>>,
 ) -> u64 {
     if path.is_file() {
         let size = file_size(path);
-        size
-    } else if path.is_dir() {
-        let size = match read_dir(path) {
-            Ok(rd) => rd
-                .into_iter()
-                .map(|entry| {
-                    let path = entry.unwrap().path();
-                    let path_str = path.to_string_lossy().to_string();
-                    let is_file = path.is_file();
 
-                    tree.push_child((path_str.clone(), 0, is_file));
-                    tree.set_current_by_val(&path_str);
+        *sum_size.write().unwrap() += size;
 
-                    let size = recurse_size_tree(app, &path, tree);
-
-                    tree.set_current_by_val(&path_str);
-                    *tree.current_mut() = (path_str, size, is_file);
-                    tree.set_current_to_parent();
-
-                    size
-                })
-                .sum(),
-            _ => 0,
-        };
-
-        *tree.current_mut() = (tree.current().0.clone(), size, tree.current().2);
-        tree.set_current_to_parent();
+        if timer.lock().unwrap().tick() {
+            window.emit("sum-size", *sum_size.read().unwrap()).unwrap();
+        }
 
         size
-    } else {
-        0
-    }
-}
-
-fn recurse_size(path: &Path) -> u64 {
-    if path.is_file() {
-        return file_size(path);
     } else if path.is_dir() {
-        return match read_dir(path) {
-            Ok(rd) => rd
-                .into_iter()
-                .par_bridge()
-                .map(|entry| {
-                    let path = entry.unwrap().path();
-                    return recurse_size(&path);
-                })
-                .sum(),
-            _ => return 0,
-        };
+        let path_buf = path.to_path_buf();
+        if map.read().unwrap().contains_key(&path_buf) {
+            *map.read().unwrap().get(&path_buf).unwrap()
+        } else {
+            let size = match read_dir(path) {
+                Ok(rd) => rd
+                    .into_iter()
+                    .par_bridge()
+                    .map(|entry| {
+                        let path = entry.unwrap().path();
+                        if map.read().unwrap().contains_key(&path) {
+                            *map.read().unwrap().get(&path).unwrap()
+                        } else {
+                            let size = recurse_size_map(
+                                Arc::clone(&window),
+                                &path,
+                                &map,
+                                Arc::clone(&sum_size),
+                                Arc::clone(&timer),
+                            );
+                            map.write().unwrap().insert(path, size);
+                            size
+                        }
+                    })
+                    .sum(),
+                _ => 0,
+            };
+            map.write().unwrap().insert(path_buf, size);
+            size
+        }
     } else {
         0
     }
@@ -99,31 +91,8 @@ fn file_size(path: &Path) -> u64 {
     }
 }
 
-fn convert_size(bytes: u64) -> String {
-    let string = bytes.to_string();
-    let bytes = bytes as f32;
-    match string.len() {
-        0..=3 => format!("{}{}", string, "B"),
-        4..=6 => format!("{:.2}{}", bytes / iec(1), "KB"),
-        7..=9 => format!("{:.2}{}", bytes / iec(2), "MB"),
-        10..=12 => format!("{:.2}{}", bytes / iec(3), "GB"),
-        13..=15 => format!("{:.2}{}", bytes / iec(4), "GB"),
-        16..=21 => format!("{:.2}{}", bytes / iec(5), "TB"),
-        _ => "0B".to_string(),
-    }
-}
-
-fn iec(pow: u32) -> f32 {
-    (1024 as u32).pow(pow) as f32
-}
-
 fn main() {
     tauri::Builder::default()
-        .setup(|app| {
-            let window = app.get_window("main").unwrap();
-            window.open_devtools();
-            Ok(())
-        })
         .invoke_handler(tauri::generate_handler![folder_size])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
