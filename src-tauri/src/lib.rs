@@ -52,7 +52,7 @@ impl Timer {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Entries {
-    root: PathBuf,
+    parent: PathBuf,
     entries: Vec<(u64, PathBuf, bool)>,
 }
 
@@ -75,7 +75,7 @@ impl Entries {
             parent = Path::new("").to_path_buf();
         }
         Self {
-            root: parent,
+            parent,
             entries,
         }
     }

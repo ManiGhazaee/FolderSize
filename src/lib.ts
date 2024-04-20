@@ -1,19 +1,19 @@
-export function convertSize(size: number): string {
+export function convertSize(size: number): [string, string] {
     let string = size.toString();
     if (range(0, 4).contains(string.length)) {
-        return `${size}B`;
+        return [`${size}`, `B`];
     } else if (range(4, 7).contains(string.length)) {
-        return `${(size / iec(1)).toFixed(2)}KB`;
+        return [`${(size / iec(1)).toFixed(2)}`, `KB`];
     } else if (range(7, 10).contains(string.length)) {
-        return `${(size / iec(2)).toFixed(2)}MB`;
+        return [`${(size / iec(2)).toFixed(2)}`, `MB`];
     } else if (range(10, 13).contains(string.length)) {
-        return `${(size / iec(3)).toFixed(2)}GB`;
+        return [`${(size / iec(3)).toFixed(2)}`, `GB`];
     } else if (range(13, 16).contains(string.length)) {
-        return `${(size / iec(4)).toFixed(2)}TB`;
+        return [`${(size / iec(4)).toFixed(2)}`, `TB`];
     } else if (range(16, 22).contains(string.length)) {
-        return `${(size / iec(4)).toFixed(2)}TB`;
+        return [`${(size / iec(4)).toFixed(2)}`, `TB`];
     } else {
-        return `0B`;
+        return [`0`, `B`];
     }
 }
 
