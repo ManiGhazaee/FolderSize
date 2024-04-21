@@ -1,5 +1,4 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(dead_code)]
 
 use std::{
     fs::read_dir,
@@ -9,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use file_size::{Entries, Timer, CACHE};
+use file_size::{Entries, Timer, MAP};
 use jwalk::rayon::iter::{ParallelBridge, ParallelIterator};
 use tauri::Runtime;
 
@@ -20,9 +19,9 @@ async fn folder_size<R: Runtime>(window: tauri::Window<R>, path: String) -> u64 
     let timer = Arc::new(Mutex::new(Timer::new(Duration::from_millis(400))));
     let sum_size: Arc<RwLock<u64>> = Arc::new(RwLock::new(0));
     let window = Arc::new(window);
-    let size = recurse_size_map(Arc::clone(&window), &path_str, &CACHE, sum_size, timer);
+    let size = recurse_size_map(Arc::clone(&window), &path_str, &MAP, sum_size, timer);
 
-    let entries = Entries::new(&path_str, &CACHE);
+    let entries = Entries::new(&path_str, size, &MAP);
 
     window.emit("entries", entries).unwrap();
 
@@ -34,7 +33,7 @@ async fn folder_size<R: Runtime>(window: tauri::Window<R>, path: String) -> u64 
 fn recurse_size_map<'a, R: Runtime>(
     window: Arc<tauri::Window<R>>,
     path: &Path,
-    map: &CACHE,
+    map: &MAP,
     sum_size: Arc<RwLock<u64>>,
     timer: Arc<Mutex<Timer>>,
 ) -> u64 {

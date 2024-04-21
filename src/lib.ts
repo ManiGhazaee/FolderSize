@@ -40,3 +40,29 @@ class Range {
 function range(start: number, end: number): Range {
     return new Range(start, end);
 }
+
+export function convertFile(fileName: string): [string, string] {
+    let x = fileName.split(".");
+    if (x.length === 1) {
+        return [fileName, ""];
+    } else {
+        return [x.slice(0, x.length - 1).join(""), "." + x[x.length - 1]];
+    }
+}
+
+export function convertPath(path: string | null): [boolean, string][] {
+    if (path === null) {
+        return [];
+    }
+    let res = [];
+    let temp = 0;
+    for (let i = 0; i < path.length; i++) {
+        if (path[i] === "/" || path[i] === "\\") {
+            res.push([false, path.slice(temp, i)]);
+            res.push([true, path[i]]);
+            temp = i + 1;
+        }
+    }
+    res.push([false, path.slice(temp, path.length)]);
+    return res as [boolean, string][];
+}

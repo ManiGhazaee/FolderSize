@@ -12,7 +12,7 @@ use std::{
 extern crate lazy_static;
 
 lazy_static! {
-    pub static ref CACHE: Arc<RwLock<HashMap<PathBuf, u64>>> =
+    pub static ref MAP: Arc<RwLock<HashMap<PathBuf, u64>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
@@ -52,12 +52,14 @@ impl Timer {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Entries {
+    size: u64,
+    root: PathBuf,
     parent: PathBuf,
     entries: Vec<(u64, PathBuf, bool)>,
 }
 
 impl Entries {
-    pub fn new(root: &PathBuf, map: &CACHE) -> Self {
+    pub fn new(root: &PathBuf, size: u64, map: &MAP) -> Self {
         let entries = match read_dir(root) {
             Ok(rd) => rd
                 .into_iter()
@@ -71,10 +73,12 @@ impl Entries {
             _ => Default::default(),
         };
         let mut parent = root.parent().unwrap_or(&Path::new("")).to_path_buf();
-        if !CACHE.read().unwrap().contains_key(&parent) {
+        if !MAP.read().unwrap().contains_key(&parent) {
             parent = Path::new("").to_path_buf();
         }
         Self {
+            size,
+            root: root.to_owned(),
             parent,
             entries,
         }
