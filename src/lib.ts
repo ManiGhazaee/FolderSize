@@ -50,7 +50,7 @@ export function convertFile(fileName: string): [string, string] {
     }
 }
 
-export function convertPath(path: string | null): [boolean, string][] {
+export function convertPath(path: string | null): [boolean, string, string][] {
     if (path === null) {
         return [];
     }
@@ -58,11 +58,11 @@ export function convertPath(path: string | null): [boolean, string][] {
     let temp = 0;
     for (let i = 0; i < path.length; i++) {
         if (path[i] === "/" || path[i] === "\\") {
-            res.push([false, path.slice(temp, i)]);
+            res.push([false, path.slice(temp, i), path.slice(0, i + 1)]);
             res.push([true, path[i]]);
             temp = i + 1;
         }
     }
-    res.push([false, path.slice(temp, path.length)]);
-    return res as [boolean, string][];
+    res.push([false, path.slice(temp, path.length), path.slice(0, path.length)]);
+    return res as [boolean, string, string][];
 }

@@ -2,23 +2,27 @@ import { open } from "@tauri-apps/api/dialog";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useState } from "react";
-import { convertFile, convertSize, fileName } from "./lib";
+import { convertFile, fileName } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import Path from "./components/Path";
+import { BarLoader } from "react-spinners";
+import Size from "./components/Size";
 
 type Entries = { size: number; root: string; parent: string; entries: [number, string, boolean][] };
 
 const icons = { back: <ReplyRoundedIcon />, select: <DriveFolderUploadIcon />, folder: <FolderIcon /> };
 const cache: [number, string, Entries][] = [];
+const defaultMaxLoad = 200;
 
 function App() {
     const [dir, setDir] = useState<string | null>(null);
     const [dirSize, setDirSize] = useState<number | null>(null);
     const [entires, setEntries] = useState<Entries | null>(null);
     const [readyToSelect, setReadyToSelect] = useState(true);
+    const [maxLoad, setMaxLoad] = useState<number>(defaultMaxLoad);
 
     async function selectDir() {
         if (!readyToSelect) {
@@ -44,6 +48,7 @@ function App() {
             return;
         }
         setReadyToSelect(false);
+        setMaxLoad(defaultMaxLoad);
         setDir(path);
         let cacheIndex = cache.findIndex((e) => e[1] === path);
         if (cacheIndex !== -1) {
@@ -86,7 +91,7 @@ function App() {
                     {icons.select}
                 </button>
             )}
-            <Path path={dir} />
+            <Path path={dir} folderSize={folderSize} />
             <div className="relative h-[calc(100vh-70px)] w-[calc(100vw-20px)] p-[10px] rounded-2xl left-1/2 -translate-x-1/2 top-[60px] bg-zinc-900 overflow-hidden">
                 {entires === null && readyToSelect && (
                     <>
@@ -101,13 +106,14 @@ function App() {
                         </button>
                     </>
                 )}
-                {entires === null && !readyToSelect && (
-                    <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-zinc-100">
-                        Scanning...
-                    </div>
-                )}
-                <div className="absolute font-bold left-1/2 -translate-x-1/2">
-                    {dirSize !== null && convertSize(dirSize)}
+                <div
+                    className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-zinc-100"
+                    style={{ visibility: entires === null && !readyToSelect ? "visible" : "hidden" }}
+                >
+                    <BarLoader color="white" />
+                </div>
+                <div className="absolute left-1/2 -translate-x-1/2">
+                    <Size size={dirSize} />
                 </div>
                 {entires !== null && (
                     <div className="relative top-[38px] overflow-y-scroll overflow-x-hidden h-[calc(100%-38px)] rounded-xl">
@@ -124,7 +130,7 @@ function App() {
                             ..
                         </div>
                         {entires.entries.map((node, index) => {
-                            let size = convertSize(node[0]);
+                            if (index > maxLoad) return null;
                             let file = node[2] ? convertFile(fileName(node[1])) : fileName(node[1]);
                             return (
                                 <div
@@ -143,17 +149,28 @@ function App() {
                                         {node[2] ? (
                                             <>
                                                 <span>{file[0]}</span>
-                                                <span className="text-red-500">{file[1]}</span>
+                                                <span className="text-zinc-500">{file[1]}</span>
                                             </>
                                         ) : (
                                             <span>{file}</span>
                                         )}
                                     </span>
-                                    <span className="relative mr-[4px]">{size[0]}</span>
-                                    <span className="relative font-bold">{size[1]}</span>
+                                    <Size size={node[0]} />
                                 </div>
                             );
                         })}
+                        {entires.entries.length > maxLoad ? (
+                            <div
+                                className={`bg-zinc-100 text-black font-bold rounded-b-xl px-[20px] py-[2px] hover:bg-zinc-300 flex flex-row`}
+                                onClick={() => {
+                                    setMaxLoad((prev) => (prev += 100));
+                                }}
+                            >
+                                Load more
+                            </div>
+                        ) : (
+                            <></>
+                        )}
                     </div>
                 )}
             </div>
