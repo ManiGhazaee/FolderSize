@@ -5,6 +5,7 @@ use std::{
     fs::read_dir,
     os::windows::fs::MetadataExt,
     path::{Path, PathBuf},
+    process::Command,
     sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
 };
@@ -52,14 +53,14 @@ impl Timer {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct Entries {
+pub struct Folder {
     size: u64,
     root: PathBuf,
     parent: PathBuf,
     entries: Vec<(u64, PathBuf, bool)>,
 }
 
-pub struct X<R: Runtime> {
+pub struct FolderSize<R: Runtime> {
     root: PathBuf,
     timer: Arc<Mutex<Timer>>,
     size: Arc<RwLock<u64>>,
@@ -67,7 +68,7 @@ pub struct X<R: Runtime> {
     map: &'static MAP,
 }
 
-impl<R: Runtime> X<R> {
+impl<R: Runtime> FolderSize<R> {
     pub fn run(root: PathBuf, window: Window<R>) -> u64 {
         let s = Self {
             root: root.clone(),
@@ -77,10 +78,13 @@ impl<R: Runtime> X<R> {
             map: &MAP,
         };
         *s.size.write().unwrap() = s.recurse(&root);
-        let entries = s.entries();
-        s.window.emit("entries", entries).unwrap();
-        let x = *s.size.read().unwrap();
-        x
+        let mut folder = s.folder();
+        folder
+            .entries
+            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        s.window.emit("folder", folder).unwrap();
+        let size = *s.size.read().unwrap();
+        size
     }
     fn recurse(&self, path: &Path) -> u64 {
         if path.is_file() {
@@ -88,7 +92,7 @@ impl<R: Runtime> X<R> {
             *self.size.write().unwrap() += size;
             if self.timer.lock().unwrap().tick() {
                 self.window
-                    .emit("sum-size", *self.size.read().unwrap())
+                    .emit("size", *self.size.read().unwrap())
                     .unwrap();
             }
             size
@@ -121,7 +125,7 @@ impl<R: Runtime> X<R> {
             0
         }
     }
-    pub fn entries(&self) -> Entries {
+    pub fn folder(&self) -> Folder {
         let entries = match read_dir(self.root.clone()) {
             Ok(rd) => rd
                 .into_iter()
@@ -138,7 +142,7 @@ impl<R: Runtime> X<R> {
         if !MAP.read().unwrap().contains_key(&parent) {
             parent = Path::new("").to_path_buf();
         }
-        Entries {
+        Folder {
             size: *self.size.read().unwrap(),
             root: self.root.to_owned(),
             parent,
@@ -151,5 +155,15 @@ pub fn size_of(path: &Path) -> u64 {
     match path.metadata() {
         Ok(m) => m.file_size(),
         _ => 0,
+    }
+}
+
+pub fn open(path: impl Into<String>) {
+    if cfg!(target_os = "windows") {
+        Command::new("explorer").arg(path.into()).spawn().unwrap();
+    } else if cfg!(target_os = "linux") {
+        Command::new("xdg-open").arg(path.into()).spawn().unwrap();
+    } else if cfg!(target_os = "macos") {
+        Command::new("open").arg(path.into()).spawn().unwrap();
     }
 }

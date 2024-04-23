@@ -26,6 +26,6 @@
     background-color: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background-color: white;
+    background-color: grey;
     border-radius: 12px;
 }
