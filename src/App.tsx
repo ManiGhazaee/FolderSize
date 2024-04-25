@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/api/dialog";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useRef, useState } from "react";
-import { convertFile, fileName } from "./lib";
+import { convertFile, fileName, isNone, isSome } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
@@ -10,25 +10,27 @@ import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import Path from "./components/Path";
 import { BarLoader } from "react-spinners";
 import Size from "./components/Size";
+import { Option, None } from "./lib";
 
 type Path = string;
 type Size = number;
 type IsFile = boolean;
-type Folder = { size: Size; root: Path; parent: Path; entries: [Size, Path, IsFile][] };
 type ContextMenu = { x: number; y: number; show: boolean; path: Path; isFile: IsFile };
+export type Folder = { size: Size; root: Path; parent: Path; entries: [Size, Path, IsFile][] };
+export type FolderCache = { items: [Size, Path, Folder][] };
 
 const icons = { back: <ReplyRoundedIcon />, select: <DriveFolderUploadIcon />, folder: <FolderIcon /> };
-const cache: [Size, Path, Folder][] = [];
-const defaultMaxLoad = 200;
+const MAXLOAD = 200;
 
 function App() {
-    const [dir, setDir] = useState<Path | null>(null);
-    const [dirSize, setDirSize] = useState<Size | null>(null);
-    const [folder, setFolder] = useState<Folder | null>(null);
+    const [dir, setDir] = useState<Option<Path>>(None);
+    const [dirSize, setDirSize] = useState<Option<Size>>(None);
+    const [folder, setFolder] = useState<Option<Folder>>(None);
     const [readyToSelect, setReadyToSelect] = useState(true);
-    const [maxLoad, setMaxLoad] = useState<number>(defaultMaxLoad);
-    const contextMenuRef = useRef<HTMLDivElement>(null);
+    const [maxLoad, setMaxLoad] = useState<number>(MAXLOAD);
+    const contextMenuRef = useRef<HTMLDivElement>(None);
     const [contextMenu, setContextMenu] = useState<ContextMenu>({ x: 0, y: 0, show: false, path: "", isFile: false });
+    const [cache, setCache] = useState<FolderCache>({ items: [] });
 
     async function selectDir() {
         if (!readyToSelect) {
@@ -38,13 +40,13 @@ function App() {
             directory: true,
             multiple: false,
             defaultPath: "/",
-        })) as Path | null;
+        })) as Option<Path>;
 
         if (selected === dir) {
             return;
         }
-        if (selected !== null) {
-            setFolder(null);
+        if (isSome(selected)) {
+            setFolder(None);
             folderSize(selected);
         }
     }
@@ -54,11 +56,12 @@ function App() {
             return;
         }
         setReadyToSelect(false);
-        setMaxLoad(defaultMaxLoad);
+        setMaxLoad(MAXLOAD);
         setDir(path);
-        let cacheIndex = cache.findIndex((e) => e[1] === path);
+
+        let cacheIndex = cache.items.findIndex((e) => e[1] === path);
         if (cacheIndex !== -1) {
-            let e = cache[cacheIndex];
+            let e = cache.items[cacheIndex];
             setDirSize(e[0]);
             setFolder(e[2]);
             setReadyToSelect(true);
@@ -78,10 +81,16 @@ function App() {
     useEffect(() => {
         listen("folder", (ev) => {
             let e = ev.payload as Folder;
-            if (cache.length === 5) {
-                cache.shift();
+            if (cache.items.length === 5) {
+                setCache((prev) => {
+                    prev.items.shift();
+                    return prev;
+                });
             }
-            cache.push([e.size, e.root, e]);
+            setCache((prev) => {
+                prev.items.push([e.size, e.root, e]);
+                return prev;
+            });
             setFolder(e);
         });
         listen("size", (ev) => {
@@ -94,7 +103,7 @@ function App() {
 
     return (
         <div className="h-[100vh] overflow-hidden">
-            {folder !== null && (
+            {isSome(folder) && (
                 <button
                     className="absolute top-[32px] -translate-y-1/2 right-[10px] bg-zinc-950 px-[6px] py-[6px] border rounded-xl border-zinc-900 text-zinc-100 hover:text-white hover:bg-zinc-900 hover:border-zinc-800 active:bg-zinc-200 active:border-zinc-300 active:text-black duration-100"
                     onClick={selectDir}
@@ -102,9 +111,9 @@ function App() {
                     {icons.select}
                 </button>
             )}
-            <Path path={dir} folderSize={folderSize} />
+            <Path path={dir} folderSize={folderSize} setFolder={setFolder} setCache={setCache} />
             <div className="relative h-[calc(100vh-70px)] w-[calc(100vw-20px)] p-[10px] rounded-2xl left-1/2 -translate-x-1/2 top-[60px] bg-zinc-900 overflow-hidden">
-                {folder === null && readyToSelect && (
+                {isNone(folder) && readyToSelect && (
                     <>
                         <div className="absolute top-[calc(50%-60px)] text-[22px] font-bold left-1/2 -translate-x-1/2">
                             Select or drop a folder
@@ -119,14 +128,14 @@ function App() {
                 )}
                 <div
                     className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 text-zinc-100"
-                    style={{ visibility: folder === null && !readyToSelect ? "visible" : "hidden" }}
+                    style={{ visibility: isNone(folder) && !readyToSelect ? "visible" : "hidden" }}
                 >
                     <BarLoader color="white" />
                 </div>
                 <div className="absolute left-1/2 -translate-x-1/2">
                     <Size size={dirSize} />
                 </div>
-                {folder !== null && (
+                {isSome(folder) && (
                     <div className="relative top-[38px] overflow-y-scroll overflow-x-hidden h-[calc(100%-38px)] rounded-xl">
                         <div
                             className="sticky top-0 w-full z-[100] bg-black font-bold px-[20px] py-[2px] hover:bg-zinc-800 rounded-t-xl"
@@ -141,7 +150,7 @@ function App() {
                             ..
                         </div>
                         {folder.entries.map((node, index) => {
-                            if (index > maxLoad) return null;
+                            if (index > maxLoad) return None;
                             let file = node[2] ? convertFile(fileName(node[1])) : fileName(node[1]);
                             return (
                                 <div

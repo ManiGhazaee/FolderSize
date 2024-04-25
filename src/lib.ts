@@ -1,3 +1,39 @@
+export type Option<T> = T | None;
+export type None = null;
+export var None: None = null;
+
+export function isSome<T>(option: Option<T>): option is T {
+    return option !== null;
+}
+
+export function isNone<T>(option: Option<T>): option is None {
+    return option === null;
+}
+
+export function unwrap<T>(option: Option<T>): T {
+    if (option !== null) {
+        return option as T;
+    } else {
+        throw new Error("unwrap on null value");
+    }
+}
+
+export function unwrapOr<T>(option: Option<T>, value: T): T {
+    if (option !== null) {
+        return option as T;
+    } else {
+        return value as T;
+    }
+}
+
+export function asOption<T>(option: T): Option<Exclude<T, null | undefined>> {
+    if (option === null || option === undefined) {
+        return None;
+    } else {
+        return option as Exclude<T, null | undefined>;
+    }
+}
+
 export function convertSize(size: number): [string, string] {
     let string = size.toString();
     if (range(0, 4).contains(string.length)) {
