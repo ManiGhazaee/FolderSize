@@ -52,12 +52,12 @@ impl Timer {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Folder {
-    size: u64,
-    root: PathBuf,
-    parent: PathBuf,
-    entries: Vec<(u64, PathBuf, bool)>,
+    pub size: u64,
+    pub root: PathBuf,
+    pub parent: PathBuf,
+    pub entries: Vec<(u64, PathBuf, bool)>,
 }
 
 pub struct FolderSize<R: Runtime> {
@@ -79,9 +79,7 @@ impl<R: Runtime> FolderSize<R> {
         };
         *s.size.write().unwrap() = s.recurse(&root);
         let mut folder = s.folder();
-        folder
-            .entries
-            .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        folder.sort();
         s.window.emit("folder", folder).unwrap();
         let size = *s.size.read().unwrap();
         size
@@ -148,6 +146,12 @@ impl<R: Runtime> FolderSize<R> {
             parent,
             entries,
         }
+    }
+}
+
+impl Folder {
+    pub fn sort(&mut self) {
+        self.entries.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
     }
 }
 

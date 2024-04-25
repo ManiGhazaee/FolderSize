@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/api/dialog";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useRef, useState } from "react";
 import { convertFile, fileName, isNone, isSome } from "./lib";
@@ -7,6 +7,7 @@ import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import SearchRounded from "@mui/icons-material/SearchRounded";
 import Path from "./components/Path";
 import { BarLoader } from "react-spinners";
 import Size from "./components/Size";
@@ -19,8 +20,18 @@ type ContextMenu = { x: number; y: number; show: boolean; path: Path; isFile: Is
 export type Folder = { size: Size; root: Path; parent: Path; entries: [Size, Path, IsFile][] };
 export type FolderCache = { items: [Size, Path, Folder][] };
 
-const icons = { back: <ReplyRoundedIcon />, select: <DriveFolderUploadIcon />, folder: <FolderIcon /> };
-const MAXLOAD = 200;
+enum State {
+    Search,
+    None,
+}
+
+const icons = {
+    back: <ReplyRoundedIcon />,
+    select: <DriveFolderUploadIcon style={{ fontSize: "20px", marginTop: "-3px" }} />,
+    search: <SearchRounded style={{ fontSize: "20px", marginTop: "-3px" }} />,
+    folder: <FolderIcon style={{ fontSize: "22px", marginTop: "-3px" }} />,
+};
+const MAXLOAD = 200 as const;
 
 function App() {
     const [dir, setDir] = useState<Option<Path>>(None);
@@ -28,9 +39,13 @@ function App() {
     const [folder, setFolder] = useState<Option<Folder>>(None);
     const [readyToSelect, setReadyToSelect] = useState(true);
     const [maxLoad, setMaxLoad] = useState<number>(MAXLOAD);
+    const [searchMaxLoad, setSearchMaxLoad] = useState<number>(MAXLOAD);
     const contextMenuRef = useRef<HTMLDivElement>(None);
     const [contextMenu, setContextMenu] = useState<ContextMenu>({ x: 0, y: 0, show: false, path: "", isFile: false });
     const [cache, setCache] = useState<FolderCache>({ items: [] });
+    const [state, setState] = useState<State>(State.None);
+    const [searchPat, setSearchPat] = useState<string>("");
+    const [searchMatches, setSearchMatches] = useState<Option<Folder>>(None);
 
     async function selectDir() {
         if (!readyToSelect) {
@@ -49,6 +64,17 @@ function App() {
             setFolder(None);
             folderSize(selected);
         }
+    }
+
+    async function search(pat: string) {
+        emit("cancel-search");
+        if (pat === "") {
+            setSearchMatches(None);
+            return;
+        }
+        let res: Folder = await invoke("search", { window: tauriWindow, pat, path: isSome(dir) ? dir : "" });
+        setSearchMatches(res);
+        console.log(res);
     }
 
     async function folderSize(path: Path) {
@@ -78,6 +104,16 @@ function App() {
         }
     }
 
+    function pathOnClick(path: Path) {
+        setState(State.None);
+        folderSize(path);
+        setFolder(None);
+        setCache((prev) => {
+            prev.items.length = 0;
+            return prev;
+        });
+    }
+
     useEffect(() => {
         listen("folder", (ev) => {
             let e = ev.payload as Folder;
@@ -103,23 +139,39 @@ function App() {
 
     return (
         <div className="h-[100vh] overflow-hidden">
+            <div style={{ visibility: state === State.Search ? "visible" : "hidden" }}></div>
             {isSome(folder) && (
                 <button
-                    className="absolute top-[32px] -translate-y-1/2 right-[10px] bg-zinc-950 px-[6px] py-[6px] border rounded-xl border-zinc-900 text-zinc-100 hover:text-white hover:bg-zinc-900 hover:border-zinc-800 active:bg-zinc-200 active:border-zinc-300 active:text-black duration-100"
+                    className="absolute top-[20px] -translate-y-1/2 right-[10px] bg-zinc-950 px-[6px] py-[4px] border rounded-xl border-zinc-900 text-zinc-100 hover:text-white hover:bg-zinc-900 hover:border-zinc-800 active:bg-zinc-200 active:border-zinc-300 active:text-black duration-100"
                     onClick={selectDir}
                 >
                     {icons.select}
                 </button>
             )}
-            <Path path={dir} folderSize={folderSize} setFolder={setFolder} setCache={setCache} />
-            <div className="relative h-[calc(100vh-70px)] w-[calc(100vw-20px)] p-[10px] rounded-2xl left-1/2 -translate-x-1/2 top-[60px] bg-zinc-900 overflow-hidden">
+            {isSome(folder) && (
+                <button
+                    className={`absolute top-[20px] -translate-y-1/2 right-[53px]  px-[6px] py-[4px] border rounded-xl ${
+                        state === State.Search
+                            ? "!border-zinc-100 !bg-zinc-100 !text-black"
+                            : "bg-zinc-950 border-zinc-900 text-zinc-100"
+                    }  hover:text-white hover:bg-zinc-900 hover:border-zinc-800 active:bg-zinc-200 active:border-zinc-300 active:text-black duration-100`}
+                    onClick={() => {
+                        setState(state === State.Search ? State.None : State.Search);
+                        document.getElementById("search-input")?.focus();
+                    }}
+                >
+                    {icons.search}
+                </button>
+            )}
+            <Path path={dir} onClick={pathOnClick} />
+            <div className="relative h-[calc(100vh-55px)] w-[calc(100vw-20px)] p-[10px] rounded-2xl left-1/2 -translate-x-1/2 top-[45px] bg-zinc-900 overflow-hidden">
                 {isNone(folder) && readyToSelect && (
                     <>
                         <div className="absolute top-[calc(50%-60px)] text-[22px] font-bold left-1/2 -translate-x-1/2">
                             Select or drop a folder
                         </div>
                         <button
-                            className="relative top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 bg-zinc-50 px-[6px] py-[6px] border rounded-xl border-zinc-50 text-zinc-900 hover:text-black hover:bg-zinc-300 hover:border-white active:bg-zinc-800 active:border-zinc-600 active:text-white duration-100"
+                            className="relative top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 bg-zinc-50 px-[6px] py-[4px] border rounded-xl border-zinc-50 text-zinc-900 hover:text-black hover:bg-zinc-300 hover:border-white active:bg-zinc-800 active:border-zinc-600 active:text-white duration-100"
                             onClick={selectDir}
                         >
                             {icons.select}
@@ -132,11 +184,115 @@ function App() {
                 >
                     <BarLoader color="white" />
                 </div>
-                <div className="absolute left-1/2 -translate-x-1/2">
+                <div
+                    className="absolute left-1/2 -translate-x-1/2 text-[14px]"
+                    style={{
+                        visibility: state !== State.Search ? "hidden" : "visible",
+                        width: state !== State.Search ? "0%" : "50%",
+                        opacity: state !== State.Search ? 0 : 1,
+                        transition: "all 200ms",
+                    }}
+                >
+                    <input
+                        id="search-input"
+                        className="w-full border border-zinc-800 rounded-lg bg-zinc-950 outline-none text-center font-light placeholder:text-zinc-600"
+                        placeholder="Type to search"
+                        type="text"
+                        value={searchPat}
+                        onChange={(ev) => {
+                            setSearchPat(ev.target.value);
+                            search(ev.target.value);
+                        }}
+                    />
+                </div>
+                <div
+                    className="absolute left-1/2 -translate-x-1/2 text-[14px]"
+                    style={{
+                        visibility: state !== State.None ? "hidden" : "visible",
+                        opacity: state !== State.None ? 0 : 1,
+                        transition: "opacity 200ms",
+                    }}
+                >
                     <Size size={dirSize} />
                 </div>
+                {isSome(searchMatches) && (
+                    <div
+                        className="relative top-[34px] overflow-y-scroll overflow-x-hidden  rounded-xl"
+                        style={{
+                            visibility: state !== State.Search ? "hidden" : "visible",
+                            opacity: state !== State.Search ? 0 : 1,
+                            height: state !== State.Search ? "0" : "calc(100% - 35px)",
+                            transition: "opacity 200ms",
+                        }}
+                    >
+                        {searchMatches.entries.map((node, index) => {
+                            if (index > searchMaxLoad) return None;
+                            let file = node[2] ? convertFile(fileName(node[1])) : fileName(node[1]);
+                            return (
+                                <div
+                                    className={`${index % 2 === 1 ? "bg-black" : "bg-transparent"} ${
+                                        index === searchMatches.entries.length - 1 ? "rounded-b-xl" : ""
+                                    } px-[20px] py-[2px] text-[14px] hover:bg-zinc-800 text-zinc-50 flex flex-row`}
+                                    onClick={() => {
+                                        if (node[2]) {
+                                            return;
+                                        }
+                                        setState(State.None);
+                                        folderSize(node[1]);
+                                    }}
+                                    onContextMenu={(ev) => {
+                                        ev.preventDefault();
+                                        let x = ev.clientX;
+                                        let y = ev.clientY;
+                                        if (contextMenuRef.current) {
+                                            if (y + contextMenuRef.current.clientHeight > window.innerHeight) {
+                                                y = window.innerHeight - contextMenuRef.current.clientHeight;
+                                            }
+                                            if (x + contextMenuRef.current.clientWidth > window.innerWidth) {
+                                                x = window.innerWidth - contextMenuRef.current.clientWidth;
+                                            }
+                                        }
+                                        setContextMenu(() => ({ show: true, x, y, path: node[1], isFile: node[2] }));
+                                    }}
+                                >
+                                    <span className="w-[34px]">{!node[2] && icons.folder}</span>
+                                    <span className="flex-grow">
+                                        {node[2] ? (
+                                            <>
+                                                <span>{file[0]}</span>
+                                                <span className="text-zinc-500">{file[1]}</span>
+                                            </>
+                                        ) : (
+                                            <span>{file}</span>
+                                        )}
+                                    </span>
+                                    <Size size={node[0]} />
+                                </div>
+                            );
+                        })}
+                        {searchMatches.entries.length > searchMaxLoad ? (
+                            <div
+                                className={`bg-zinc-100 text-black font-bold rounded-b-xl px-[20px] py-[2px] hover:bg-zinc-300 flex flex-row`}
+                                onClick={() => {
+                                    setSearchMaxLoad((prev) => (prev += 100));
+                                }}
+                            >
+                                Load more
+                            </div>
+                        ) : (
+                            <></>
+                        )}
+                    </div>
+                )}
                 {isSome(folder) && (
-                    <div className="relative top-[38px] overflow-y-scroll overflow-x-hidden h-[calc(100%-38px)] rounded-xl">
+                    <div
+                        className="relative top-[34px] overflow-y-scroll overflow-x-hidden h-[calc(100%-35px)] rounded-xl"
+                        style={{
+                            visibility: state !== State.None ? "hidden" : "visible",
+                            opacity: state !== State.None ? 0 : 1,
+                            transition: "opacity 200ms",
+                        }}
+                    >
                         <div
                             className="sticky top-0 w-full z-[100] bg-black font-bold px-[20px] py-[2px] hover:bg-zinc-800 rounded-t-xl"
                             onClick={() => {
@@ -156,7 +312,7 @@ function App() {
                                 <div
                                     className={`${index % 2 === 1 ? "bg-black" : "bg-transparent"} ${
                                         index === folder.entries.length - 1 ? "rounded-b-xl" : ""
-                                    } px-[20px] py-[2px] hover:bg-zinc-800 text-zinc-50 flex flex-row`}
+                                    } px-[20px] py-[2px] text-[14px] hover:bg-zinc-800 text-zinc-50 flex flex-row`}
                                     onClick={() => {
                                         if (node[2]) {
                                             return;
