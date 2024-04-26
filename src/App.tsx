@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/api/dialog";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useRef, useState } from "react";
-import { convertFile, convertMatch, convertSize, fileName, isNone, isSome } from "./lib";
+import { convertFile, convertMatch, fileName, isNone, isSome } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
@@ -208,6 +208,7 @@ function App() {
                 >
                     <input
                         id="search-input"
+                        spellCheck="false"
                         className="w-full border border-zinc-800 rounded-lg bg-zinc-950 outline-none text-center font-light placeholder:text-zinc-500"
                         placeholder="Type to search"
                         type="text"
@@ -265,7 +266,7 @@ function App() {
                                                 x = window.innerWidth - contextMenuRef.current.clientWidth;
                                             }
                                         }
-                                        setContextMenu(() => ({ show: true, x, y, path: node[1], isFile: node[2] }));
+                                        setContextMenu(() => ({ show: true, x, y, path: node[1] }));
                                     }}
                                 >
                                     <span className="w-[34px]">{!node[2] && icons.folder}</span>
@@ -281,8 +282,6 @@ function App() {
                                                         <span className="">{e[1]}</span>
                                                     )
                                                 )}
-                                                {/* <span>{file[0]}</span> */}
-                                                {/* <span className="text-zinc-500">{file[1]}</span> */}
                                             </>
                                         }
                                     </span>
@@ -297,7 +296,7 @@ function App() {
                                     setSearchMaxLoad((prev) => (prev += 100));
                                 }}
                             >
-                                Load more
+                                Show more
                             </div>
                         ) : (
                             <></>
@@ -314,7 +313,9 @@ function App() {
                         }}
                     >
                         <div
-                            className="sticky top-0 w-full z-[100] bg-black font-bold px-[20px] py-[2px] hover:bg-zinc-800 rounded-t-xl"
+                            className={`${
+                                folder.parent === "" ? "" : "active:bg-zinc-100 active:text-black"
+                            } sticky top-0 w-full z-[100] bg-black font-bold px-[20px] py-[2px] hover:bg-zinc-800 rounded-t-xl `}
                             onClick={() => {
                                 if (folder.parent === "") {
                                     return;
@@ -332,7 +333,9 @@ function App() {
                                 <div
                                     className={`${index % 2 === 1 ? "bg-black" : "bg-transparent"} ${
                                         index === folder.entries.length - 1 ? "rounded-b-xl" : ""
-                                    } px-[20px] py-[2px] text-[14px] hover:bg-zinc-800 text-zinc-50 flex flex-row`}
+                                    } ${
+                                        node[2] ? "" : "active:bg-zinc-100 active:text-black duration-100"
+                                    }  px-[20px] py-[2px] text-[14px] hover:bg-zinc-800 text-zinc-50 flex flex-row`}
                                     onClick={() => {
                                         if (node[2]) {
                                             return;
@@ -376,7 +379,7 @@ function App() {
                                     setMaxLoad((prev) => (prev += 100));
                                 }}
                             >
-                                Load more
+                                Show more
                             </div>
                         ) : (
                             <></>
@@ -429,7 +432,7 @@ function App() {
                 className="absolute z-[120] text-[14px] text-zinc-100 px-[26px] py-[22px] top-1/2 -translate-x-1/2 left-1/2 -translate-y-1/2 bg-zinc-950 rounded-xl border border-zinc-900 overflow-hidden "
                 style={{
                     visibility: isSome(details) ? "visible" : "hidden",
-                    transition: "200ms",
+                    transition: "150ms",
                     opacity: isSome(details) ? 1 : 0,
                     width: isSome(details) ? "400px" : 0,
                     height: "400px",
@@ -437,11 +440,15 @@ function App() {
             >
                 <div
                     style={{
-                        transition: isSome(details) ? "all 100ms 180ms" : "all 0ms 0ms",
+                        transition: isSome(details) ? "all 100ms 120ms" : "all 0ms 0ms",
                         opacity: isSome(details) ? 1 : 0,
                     }}
                 >
-                    <div className="font-bold text-[18px] break-words mb-[30px]">{fileName(details?.path ?? "")}</div>
+                    <div className="font-bold text-[18px] break-words mb-[30px] max-h-[72px] overflow-y-auto">{fileName(details?.path ?? "")}</div>
+                    <div className="flex flex-col">
+                        <div className="flex-grow text-zinc-500">Path:</div>
+                        <div className="break-words max-h-[50px] overflow-y-auto">{details?.path}</div>
+                    </div>
                     <div className="flex flex-row">
                         <div className="flex-grow text-zinc-500">Size:</div>
                         <Size size={details?.file_size ?? 0} />
