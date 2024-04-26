@@ -1,13 +1,15 @@
+use chrono::{DateTime, Local};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::read_dir,
+    io,
     os::windows::fs::MetadataExt,
     path::{Path, PathBuf},
     process::Command,
     sync::{Arc, Mutex, RwLock},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 use tauri::{Runtime, Window};
 
@@ -50,6 +52,15 @@ impl Timer {
         }
         d1
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct Details {
+    created: String,
+    accessed: String,
+    modified: String,
+    premissions: bool,
+    file_size: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -152,6 +163,28 @@ impl<R: Runtime> FolderSize<R> {
 impl Folder {
     pub fn sort(&mut self) {
         self.entries.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    }
+}
+
+impl Details {
+    pub fn new(path: &str) -> Self {
+        let path = Path::new(path);
+        let md = path.metadata().unwrap();
+        Self {
+            created: format_systime(md.created()),
+            accessed: format_systime(md.accessed()),
+            modified: format_systime(md.modified()),
+            premissions: md.permissions().readonly(),
+            file_size: *MAP.read().unwrap().get(&path.to_path_buf()).unwrap_or(&0),
+        }
+    }
+}
+
+fn format_systime(time: Result<SystemTime, io::Error>) -> String {
+    if let Ok(time) = time {
+        format!("{}", DateTime::<Local>::from(time).format("%m/%d/%Y %H:%M"))
+    } else {
+        "unknown".to_string()
     }
 }
 

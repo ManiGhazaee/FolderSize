@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use file_size::{open, Folder, FolderSize, MAP};
+use file_size::{open, Details, Folder, FolderSize, MAP};
 use tauri::{Manager, Runtime};
 
 #[tauri::command]
@@ -50,19 +50,25 @@ async fn search<R: Runtime>(window: tauri::Window<R>, pat: String, path: String)
 }
 
 #[tauri::command]
-async fn reveal(path: String, is_file: bool) {
-    if is_file {
-        if let Some(path) = Path::new(&path).to_path_buf().parent() {
-            open(path.to_string_lossy());
+async fn reveal(path: String) {
+    let p = Path::new(&path);
+    if p.is_file() {
+        if let Some(p) = p.to_path_buf().parent() {
+            open(p.to_string_lossy());
         }
     } else {
         open(path);
     }
 }
 
+#[tauri::command]
+async fn details(path: String) -> Details {
+    Details::new(&path)
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![folder_size, reveal, search])
+        .invoke_handler(tauri::generate_handler![folder_size, reveal, search, details])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

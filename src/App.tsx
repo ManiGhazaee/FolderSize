@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/api/dialog";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useRef, useState } from "react";
-import { convertFile, convertMatch, fileName, isNone, isSome } from "./lib";
+import { convertFile, convertMatch, convertSize, fileName, isNone, isSome } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
@@ -16,9 +16,17 @@ import { Option, None } from "./lib";
 type Path = string;
 type Size = number;
 type IsFile = boolean;
-type ContextMenu = { x: number; y: number; show: boolean; path: Path; isFile: IsFile };
+type ContextMenu = { x: number; y: number; show: boolean; path: Path };
 export type Folder = { size: Size; root: Path; parent: Path; entries: [Size, Path, IsFile][] };
 export type FolderCache = { items: [Size, Path, Folder][] };
+export type Details = {
+    path: Path;
+    created: string;
+    accessed: string;
+    modified: string;
+    premissions: boolean;
+    file_size: number;
+};
 
 enum State {
     Search,
@@ -41,11 +49,12 @@ function App() {
     const [maxLoad, setMaxLoad] = useState<number>(MAXLOAD);
     const [searchMaxLoad, setSearchMaxLoad] = useState<number>(MAXLOAD);
     const contextMenuRef = useRef<HTMLDivElement>(None);
-    const [contextMenu, setContextMenu] = useState<ContextMenu>({ x: 0, y: 0, show: false, path: "", isFile: false });
+    const [contextMenu, setContextMenu] = useState<ContextMenu>({ x: 0, y: 0, show: false, path: "" });
     const [cache, setCache] = useState<FolderCache>({ items: [] });
     const [state, setState] = useState<State>(State.None);
     const [searchPat, setSearchPat] = useState<string>("");
     const [searchMatches, setSearchMatches] = useState<Option<Folder>>(None);
+    const [details, setDetails] = useState<Option<Details>>(None);
 
     async function selectDir() {
         if (!readyToSelect) {
@@ -98,10 +107,14 @@ function App() {
         setReadyToSelect(true);
     }
 
-    async function reveal(path: Path, isFile: IsFile) {
+    async function reveal(path: Path) {
         if (path !== "") {
-            await invoke("reveal", { path, isFile });
+            await invoke("reveal", { path });
         }
+    }
+    async function getDetails(path: Path) {
+        let res: Details = await invoke("details", { path });
+        setDetails({ ...res, path });
     }
 
     function pathOnClick(path: Path) {
@@ -195,7 +208,7 @@ function App() {
                 >
                     <input
                         id="search-input"
-                        className="w-full border border-zinc-800 rounded-lg bg-zinc-950 outline-none text-center font-light placeholder:text-zinc-600"
+                        className="w-full border border-zinc-800 rounded-lg bg-zinc-950 outline-none text-center font-light placeholder:text-zinc-500"
                         placeholder="Type to search"
                         type="text"
                         value={searchPat}
@@ -382,15 +395,77 @@ function App() {
                     opacity: contextMenu.show ? 1 : 0,
                 }}
             >
-                <div className="flex flex-col rounded-lg p-[4px]  border border-zinc-900 bg-zinc-950 text-[14px]">
+                <div className="flex flex-col rounded-lg p-[4px]  border border-zinc-900 bg-zinc-950 text-[12px]">
                     <div
                         className="bg-zinc-950 rounded-md px-[16px] py-[2px] text-zinc-100 hover:bg-zinc-900  hover:text-white"
                         onClick={() => {
                             setContextMenu((prev) => ({ ...prev, show: false }));
-                            reveal(contextMenu.path, contextMenu.isFile);
+                            navigator.clipboard.writeText(contextMenu.path);
+                        }}
+                    >
+                        Copy path
+                    </div>
+                    <div
+                        className="bg-zinc-950 rounded-md px-[16px] py-[2px] text-zinc-100 hover:bg-zinc-900  hover:text-white"
+                        onClick={() => {
+                            setContextMenu((prev) => ({ ...prev, show: false }));
+                            reveal(contextMenu.path);
                         }}
                     >
                         Reveal in file explorer
+                    </div>
+                    <div
+                        className="bg-zinc-950 rounded-md px-[16px] py-[2px] text-zinc-100 hover:bg-zinc-900  hover:text-white"
+                        onClick={() => {
+                            setContextMenu((prev) => ({ ...prev, show: false }));
+                            getDetails(contextMenu.path);
+                        }}
+                    >
+                        Details
+                    </div>
+                </div>
+            </div>
+            <div
+                className="absolute z-[120] text-[14px] text-zinc-100 px-[26px] py-[22px] top-1/2 -translate-x-1/2 left-1/2 -translate-y-1/2 bg-zinc-950 rounded-xl border border-zinc-900 overflow-hidden "
+                style={{
+                    visibility: isSome(details) ? "visible" : "hidden",
+                    transition: "200ms",
+                    opacity: isSome(details) ? 1 : 0,
+                    width: isSome(details) ? "400px" : 0,
+                    height: "400px",
+                }}
+            >
+                <div
+                    style={{
+                        transition: isSome(details) ? "all 100ms 180ms" : "all 0ms 0ms",
+                        opacity: isSome(details) ? 1 : 0,
+                    }}
+                >
+                    <div className="font-bold text-[18px] break-words mb-[30px]">{fileName(details?.path ?? "")}</div>
+                    <div className="flex flex-row">
+                        <div className="flex-grow text-zinc-500">Size:</div>
+                        <Size size={details?.file_size ?? 0} />
+                    </div>
+                    <div className="flex flex-row">
+                        <div className="flex-grow text-zinc-500">Bytes:</div>
+                        <div>{details?.file_size}</div>
+                    </div>
+
+                    <div className="flex flex-row">
+                        <div className="flex-grow text-zinc-500">Created:</div>
+                        <div>{details?.created}</div>
+                    </div>
+                    <div className="flex flex-row">
+                        <div className="flex-grow text-zinc-500">Last accessed:</div>
+                        <div>{details?.accessed}</div>
+                    </div>
+                    <div className="flex flex-row">
+                        <div className="flex-grow text-zinc-500">Last modified:</div>
+                        <div>{details?.modified}</div>
+                    </div>
+                    <div className="flex flex-row">
+                        <div className="flex-grow text-zinc-500">Readonly:</div>
+                        <div>{details?.premissions ? "True" : "False"}</div>
                     </div>
                 </div>
             </div>
@@ -399,6 +474,13 @@ function App() {
                 style={{ visibility: contextMenu.show ? "visible" : "hidden" }}
                 onClick={() => {
                     setContextMenu((prev) => ({ ...prev, show: false }));
+                }}
+            ></div>
+            <div
+                className="absolute top-0 left-0 w-screen h-screen z-[110]"
+                style={{ visibility: isSome(details) ? "visible" : "hidden" }}
+                onClick={() => {
+                    setDetails(None);
                 }}
             ></div>
         </div>
