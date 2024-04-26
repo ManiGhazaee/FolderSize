@@ -102,3 +102,19 @@ export function convertPath(path: string | null): [boolean, string, string][] {
     res.push([false, path.slice(temp, path.length), path.slice(0, path.length)]);
     return res as [boolean, string, string][];
 }
+
+export function convertMatch(string: string, pat: string): [boolean, string][] {
+    let res = [];
+    let temp = 0;
+    for (let i = 0; i <= string.length - pat.length; i++) {
+        if (string.slice(i, i + pat.length) === pat) {
+            res.push([false, string.slice(temp, i)]);
+            res.push([true, pat]);
+            i += pat.length;
+            temp = i;
+        }
+    }
+    res.push([false, string.slice(temp, string.length)]);
+    console.log(res);
+    return res as [boolean, string][];
+}

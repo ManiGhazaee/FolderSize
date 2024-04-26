@@ -1,4 +1,4 @@
-use jwalk::rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,

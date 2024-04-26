@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/api/dialog";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useRef, useState } from "react";
-import { convertFile, fileName, isNone, isSome } from "./lib";
+import { convertFile, convertMatch, fileName, isNone, isSome } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
@@ -106,12 +106,12 @@ function App() {
 
     function pathOnClick(path: Path) {
         setState(State.None);
-        folderSize(path);
         setFolder(None);
         setCache((prev) => {
             prev.items.length = 0;
             return prev;
         });
+        folderSize(path);
     }
 
     useEffect(() => {
@@ -227,7 +227,7 @@ function App() {
                     >
                         {searchMatches.entries.map((node, index) => {
                             if (index > searchMaxLoad) return None;
-                            let file = node[2] ? convertFile(fileName(node[1])) : fileName(node[1]);
+                            let file = convertMatch(fileName(node[1]), searchPat);
                             return (
                                 <div
                                     className={`${index % 2 === 1 ? "bg-black" : "bg-transparent"} ${
@@ -257,14 +257,21 @@ function App() {
                                 >
                                     <span className="w-[34px]">{!node[2] && icons.folder}</span>
                                     <span className="flex-grow">
-                                        {node[2] ? (
+                                        {
                                             <>
-                                                <span>{file[0]}</span>
-                                                <span className="text-zinc-500">{file[1]}</span>
+                                                {file.map((e) =>
+                                                    e[0] ? (
+                                                        <span className="bg-zinc-100 text-black rounded-sm">
+                                                            {e[1]}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="">{e[1]}</span>
+                                                    )
+                                                )}
+                                                {/* <span>{file[0]}</span> */}
+                                                {/* <span className="text-zinc-500">{file[1]}</span> */}
                                             </>
-                                        ) : (
-                                            <span>{file}</span>
-                                        )}
+                                        }
                                     </span>
                                     <Size size={node[0]} />
                                 </div>
