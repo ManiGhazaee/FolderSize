@@ -2,16 +2,20 @@ import { open } from "@tauri-apps/api/dialog";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useRef, useState } from "react";
-import { convertFile, convertMatch, fileName, isNone, isSome } from "./lib";
+import { convertFile, convertMatch, convertSize, fileName, isNone, isSome } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import SearchRounded from "@mui/icons-material/SearchRounded";
+import PieChartRoundedIcon from "@mui/icons-material/PieChartRounded";
 import Path from "./components/Path";
 import { BarLoader } from "react-spinners";
 import Size from "./components/Size";
 import { Option, None } from "./lib";
+import { pieArcClasses, pieArcLabelClasses, PieChart } from "@mui/x-charts/PieChart";
+import { axisClasses, barElementClasses } from "@mui/x-charts";
+import { tooltipClasses } from "@mui/material";
 
 type Path = string;
 type Size = number;
@@ -30,6 +34,7 @@ export type Details = {
 
 enum State {
     Search,
+    Chart,
     None,
 }
 
@@ -37,6 +42,7 @@ const icons = {
     back: <ReplyRoundedIcon />,
     select: <DriveFolderUploadIcon style={{ fontSize: "20px", marginTop: "-3px" }} />,
     search: <SearchRounded style={{ fontSize: "20px", marginTop: "-3px" }} />,
+    chart: <PieChartRoundedIcon style={{ fontSize: "20px", marginTop: "-3px" }} />,
     folder: <FolderIcon style={{ fontSize: "22px", marginTop: "-3px" }} />,
 };
 const MAXLOAD = 200 as const;
@@ -49,6 +55,7 @@ function App() {
     const [maxLoad, setMaxLoad] = useState<number>(MAXLOAD);
     const [searchMaxLoad, setSearchMaxLoad] = useState<number>(MAXLOAD);
     const contextMenuRef = useRef<HTMLDivElement>(None);
+    const searchInputRef = useRef<HTMLInputElement>(None);
     const [contextMenu, setContextMenu] = useState<ContextMenu>({ x: 0, y: 0, show: false, path: "" });
     const [cache, setCache] = useState<FolderCache>({ items: [] });
     const [state, setState] = useState<State>(State.None);
@@ -170,10 +177,24 @@ function App() {
                     }  hover:text-white hover:bg-zinc-900 hover:border-zinc-800 active:bg-zinc-200 active:border-zinc-300 active:text-black duration-100`}
                     onClick={() => {
                         setState(state === State.Search ? State.None : State.Search);
-                        document.getElementById("search-input")?.focus();
+                        searchInputRef.current?.focus();
                     }}
                 >
                     {icons.search}
+                </button>
+            )}
+            {isSome(folder) && (
+                <button
+                    className={`absolute top-[20px] -translate-y-1/2 right-[96px]  px-[6px] py-[4px] border rounded-xl ${
+                        state === State.Chart
+                            ? "!border-zinc-100 !bg-zinc-100 !text-black"
+                            : "bg-zinc-950 border-zinc-900 text-zinc-100"
+                    }  hover:text-white hover:bg-zinc-900 hover:border-zinc-800 active:bg-zinc-200 active:border-zinc-300 active:text-black duration-100`}
+                    onClick={() => {
+                        setState(state === State.Chart ? State.None : State.Chart);
+                    }}
+                >
+                    {icons.chart}
                 </button>
             )}
             <Path path={dir} onClick={pathOnClick} />
@@ -208,6 +229,7 @@ function App() {
                 >
                     <input
                         id="search-input"
+                        ref={searchInputRef}
                         spellCheck="false"
                         className="w-full border border-zinc-800 rounded-lg bg-zinc-950 outline-none text-center font-light placeholder:text-zinc-500"
                         placeholder="Type to search"
@@ -229,6 +251,48 @@ function App() {
                 >
                     <Size size={dirSize} />
                 </div>
+                {isSome(folder) && state === State.Chart && (
+                    <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
+                        <PieChart
+                            slotProps={{
+                                legend: { hidden: true },
+                            }}
+                            series={[
+                                {
+                                    data: folder.entries
+                                        .map((node, i) => {
+                                            if (i > 9) return;
+                                            return {
+                                                id: i,
+                                                value: node[0],
+                                                label: fileName(node[1]),
+                                                color: node[2] ? "rgb(39, 39, 42)" : "rgb(113, 113, 122)",
+                                            };
+                                        })
+                                        .slice(0, 10) as { id: number; value: number; color: string; label: string }[],
+                                    valueFormatter: (v) => {
+                                        let s = convertSize(v.value);
+                                        return `${s[0]}${s[1]}`;
+                                    },
+                                    innerRadius: 0,
+                                    outerRadius: 240,
+                                    paddingAngle: 2,
+                                    cornerRadius: 5,
+                                    cx: 300,
+                                    cy: 300,
+                                },
+                            ]}
+                            sx={{
+                                [`& .${pieArcClasses.root}`]: {
+                                    fill: "black",
+                                    stroke: "rgb(63, 63, 70)",
+                                },
+                            }}
+                            width={600}
+                            height={600}
+                        />
+                    </div>
+                )}
                 {isSome(searchMatches) && (
                     <div
                         className="relative top-[34px] overflow-y-scroll overflow-x-hidden  rounded-xl"
@@ -444,7 +508,9 @@ function App() {
                         opacity: isSome(details) ? 1 : 0,
                     }}
                 >
-                    <div className="font-bold text-[18px] break-words mb-[30px] max-h-[72px] overflow-y-auto">{fileName(details?.path ?? "")}</div>
+                    <div className="font-bold text-[18px] break-words mb-[30px] max-h-[72px] overflow-y-auto">
+                        {fileName(details?.path ?? "")}
+                    </div>
                     <div className="flex flex-col">
                         <div className="flex-grow text-zinc-500">Path:</div>
                         <div className="break-words max-h-[50px] overflow-y-auto">{details?.path}</div>
