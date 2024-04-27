@@ -1,7 +1,7 @@
 [package]
-name = "file_size"
+name = "folder_size"
 version = "0.0.0"
-description = "File Size"
+description = "Folder Size"
 authors = ["you"]
 license = ""
 repository = ""

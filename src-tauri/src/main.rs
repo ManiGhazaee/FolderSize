@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use file_size::{open, Details, Folder, FolderSize, MAP};
+use folder_size::{open, Details, Folder, FolderSize, MAP};
 use tauri::{Manager, Runtime};
 
 #[tauri::command]
