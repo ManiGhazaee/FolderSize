@@ -174,7 +174,7 @@ function App() {
             )}
             {isSome(folder) && (
                 <button
-                    className={`absolute top-[20px] -translate-y-1/2 right-[53px]  px-[6px] py-[4px] border rounded-xl ${
+                    className={`absolute top-[20px] -translate-y-1/2 right-[53px] px-[6px] py-[4px] border rounded-xl ${
                         state === State.Search
                             ? "!border-zinc-100 !bg-zinc-100 !text-black"
                             : "bg-zinc-950 border-zinc-900 text-zinc-100"
@@ -202,10 +202,10 @@ function App() {
                 </button>
             )}
             <Path path={dir} onClick={pathOnClick} />
-            <div className="relative h-[calc(100vh-55px)] w-[calc(100vw-20px)] p-[10px] rounded-2xl left-1/2 -translate-x-1/2 top-[45px] bg-zinc-900 overflow-hidden">
+            <div className="relative h-[calc(100vh-55px)] w-[calc(100vw-20px)] p-[10px] rounded-2xl left-1/2 -translate-x-1/2 top-[45px] border border-zinc-800 bg-zinc-900 overflow-hidden">
                 {isNone(folder) && readyToSelect && (
                     <>
-                        <div className="absolute top-[calc(50%-60px)] text-[22px] font-bold left-1/2 -translate-x-1/2">
+                        <div className="absolute top-[calc(50%-60px)] text-[18px] font-bold left-1/2 -translate-x-1/2">
                             Select or drop a folder
                         </div>
                         <button
@@ -223,7 +223,7 @@ function App() {
                     <BarLoader color="white" />
                 </div>
                 <div
-                    className="absolute left-1/2 -translate-x-1/2 text-[14px]"
+                    className="absolute left-1/2 -translate-x-1/2 text-[14px] top-[9px]"
                     style={{
                         visibility: state !== State.Search ? "hidden" : "visible",
                         width: state !== State.Search ? "0%" : "50%",
@@ -235,7 +235,7 @@ function App() {
                         id="search-input"
                         ref={searchInputRef}
                         spellCheck="false"
-                        className="w-full border border-zinc-800 rounded-lg bg-zinc-950 outline-none text-center font-light placeholder:text-zinc-500"
+                        className="w-full border border-zinc-900 rounded-lg bg-zinc-950 outline-none text-center font-light placeholder:text-zinc-500"
                         placeholder="Type to search"
                         type="text"
                         value={searchPat}
@@ -308,7 +308,7 @@ function App() {
                             let file = convertMatch(fileName(node[1]), searchPat);
                             return (
                                 <div
-                                    className={`${index % 2 === 1 ? "bg-black" : "bg-transparent"} ${
+                                    className={`${index % 2 === 1 ? "bg-zinc-950" : "bg-transparent"} ${
                                         index === searchMatches.entries.length - 1 ? "rounded-b-xl" : ""
                                     } px-[20px] py-[2px] text-[14px] hover:bg-zinc-800 text-zinc-50 flex flex-row`}
                                     onClick={() => {
@@ -379,7 +379,7 @@ function App() {
                         <div
                             className={`${
                                 folder.parent === "" ? "" : "active:bg-zinc-100 active:text-black"
-                            } sticky top-0 w-full z-[100] bg-black font-bold px-[20px] py-[2px] hover:bg-zinc-800 rounded-t-xl `}
+                            } sticky top-0 w-full z-[100] bg-zinc-950 font-bold px-[20px] py-[2px] hover:bg-zinc-800 rounded-t-xl `}
                             onClick={() => {
                                 if (folder.parent === "") {
                                     return;
@@ -395,7 +395,7 @@ function App() {
                             let file = node[2] ? convertFile(fileName(node[1])) : fileName(node[1]);
                             return (
                                 <div
-                                    className={`${index % 2 === 1 ? "bg-black" : "bg-transparent"} ${
+                                    className={`${index % 2 === 1 ? "bg-zinc-950" : "bg-transparent"} ${
                                         index === folder.entries.length - 1 ? "rounded-b-xl" : ""
                                     } ${
                                         node[2] ? "" : "active:bg-zinc-100 active:text-black duration-100"
