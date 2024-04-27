@@ -126,20 +126,20 @@ export function pieData(
     folder: Folder,
     cache: PieCache,
     setCache: Dispatch<SetStateAction<PieCache>>
-): { id: number; value: number; label: string; color: string }[] {
+): { id: string; value: number; label: string; color: string }[] {
     if (cache.has(folder.root)) {
         return cache.get(folder.root)!;
     }
     let other = folder.entries.slice(10);
-    let res = folder.entries.slice(0, 10).map((node, i) => ({
-        id: i,
+    let res = folder.entries.slice(0, 10).map((node) => ({
+        id: node[1],
         value: node[0],
         label: fileName(node[1]),
         color: node[2] ? "rgb(39, 39, 42)" : "rgb(113, 113, 122)",
     }));
     if (other && other.length !== 0) {
         let size = other.reduce((prev, curr) => prev + curr[0], 0);
-        res.push({ id: res.length, value: size, label: "Other", color: "rgb(212, 212, 216)" });
+        res.push({ id: "Other", value: size, label: "Other", color: "rgb(212, 212, 216)" });
     }
     setCache((prev) => {
         prev.set(folder.root, res);

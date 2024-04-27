@@ -21,7 +21,7 @@ type IsFile = boolean;
 type ContextMenu = { x: number; y: number; show: boolean; path: Path };
 export type Folder = { size: Size; root: Path; parent: Path; entries: [Size, Path, IsFile][] };
 export type FolderCache = { items: [Size, Path, Folder][] };
-export type PieCache = Map<string, { id: number; value: number; label: string; color: string }[]>;
+export type PieCache = Map<string, { id: string; value: number; label: string; color: string }[]>;
 export type Details = {
     path: Path;
     created: string;
@@ -78,6 +78,7 @@ function App() {
         }
         if (isSome(selected)) {
             setFolder(None);
+            setState(State.None);
             folderSize(selected);
         }
     }
@@ -90,7 +91,6 @@ function App() {
         }
         let res: Folder = await invoke("search", { window: tauriWindow, pat, path: isSome(dir) ? dir : "" });
         setSearchMatches(res);
-        console.log(res);
     }
 
     async function folderSize(path: Path) {
@@ -125,7 +125,9 @@ function App() {
     }
 
     function pathOnClick(path: Path) {
-        setState(State.None);
+        if (state === State.Search) {
+            setState(State.None);
+        }
         setFolder(None);
         setFolderCache((prev) => {
             prev.items.length = 0;
@@ -153,6 +155,8 @@ function App() {
             setDirSize(ev.payload as Size);
         });
         listen("tauri://file-drop", (ev) => {
+            setFolder(None);
+            setState(State.None);
             folderSize((ev.payload as Path[])[0]);
         });
     }, []);
@@ -272,6 +276,12 @@ function App() {
                                     cy: 300,
                                 },
                             ]}
+                            onItemClick={(_, __, item) => {
+                                if (item.id === "Other" || item.color !== "rgb(113, 113, 122)") {
+                                    return;
+                                }
+                                folderSize(item.id as string);
+                            }}
                             sx={{
                                 [`& .${pieArcClasses.root}`]: {
                                     fill: "black",
@@ -513,7 +523,6 @@ function App() {
                         <div className="flex-grow text-zinc-500">Bytes:</div>
                         <div>{details?.file_size}</div>
                     </div>
-
                     <div className="flex flex-row">
                         <div className="flex-grow text-zinc-500">Created:</div>
                         <div>{details?.created}</div>
