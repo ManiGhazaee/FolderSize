@@ -1,3 +1,6 @@
+import { Dispatch, SetStateAction } from "react";
+import { Folder, PieCache } from "./App";
+
 export type Option<T> = T | None;
 export type None = null;
 export var None: None = null;
@@ -117,4 +120,30 @@ export function convertMatch(string: string, pat: string): [boolean, string][] {
     res.push([false, string.slice(temp, string.length)]);
     console.log(res);
     return res as [boolean, string][];
+}
+
+export function pieData(
+    folder: Folder,
+    cache: PieCache,
+    setCache: Dispatch<SetStateAction<PieCache>>
+): { id: number; value: number; label: string; color: string }[] {
+    if (cache.has(folder.root)) {
+        return cache.get(folder.root)!;
+    }
+    let other = folder.entries.slice(10);
+    let res = folder.entries.slice(0, 10).map((node, i) => ({
+        id: i,
+        value: node[0],
+        label: fileName(node[1]),
+        color: node[2] ? "rgb(39, 39, 42)" : "rgb(113, 113, 122)",
+    }));
+    if (other && other.length !== 0) {
+        let size = other.reduce((prev, curr) => prev + curr[0], 0);
+        res.push({ id: res.length, value: size, label: "Other", color: "rgb(212, 212, 216)" });
+    }
+    setCache((prev) => {
+        prev.set(folder.root, res);
+        return prev;
+    });
+    return res;
 }

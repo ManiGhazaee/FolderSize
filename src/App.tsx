@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/api/dialog";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
 import { useEffect, useRef, useState } from "react";
-import { convertFile, convertMatch, convertSize, fileName, isNone, isSome } from "./lib";
+import { convertFile, convertMatch, convertSize, fileName, isNone, isSome, pieData } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
 import DriveFolderUploadIcon from "@mui/icons-material/DriveFolderUpload";
@@ -13,9 +13,7 @@ import Path from "./components/Path";
 import { BarLoader } from "react-spinners";
 import Size from "./components/Size";
 import { Option, None } from "./lib";
-import { pieArcClasses, pieArcLabelClasses, PieChart } from "@mui/x-charts/PieChart";
-import { axisClasses, barElementClasses } from "@mui/x-charts";
-import { tooltipClasses } from "@mui/material";
+import { pieArcClasses, PieChart } from "@mui/x-charts/PieChart";
 
 type Path = string;
 type Size = number;
@@ -23,6 +21,7 @@ type IsFile = boolean;
 type ContextMenu = { x: number; y: number; show: boolean; path: Path };
 export type Folder = { size: Size; root: Path; parent: Path; entries: [Size, Path, IsFile][] };
 export type FolderCache = { items: [Size, Path, Folder][] };
+export type PieCache = Map<string, { id: number; value: number; label: string; color: string }[]>;
 export type Details = {
     path: Path;
     created: string;
@@ -57,7 +56,8 @@ function App() {
     const contextMenuRef = useRef<HTMLDivElement>(None);
     const searchInputRef = useRef<HTMLInputElement>(None);
     const [contextMenu, setContextMenu] = useState<ContextMenu>({ x: 0, y: 0, show: false, path: "" });
-    const [cache, setCache] = useState<FolderCache>({ items: [] });
+    const [folderCache, setFolderCache] = useState<FolderCache>({ items: [] });
+    const [pieCache, setPieCache] = useState<PieCache>(new Map());
     const [state, setState] = useState<State>(State.None);
     const [searchPat, setSearchPat] = useState<string>("");
     const [searchMatches, setSearchMatches] = useState<Option<Folder>>(None);
@@ -101,9 +101,9 @@ function App() {
         setMaxLoad(MAXLOAD);
         setDir(path);
 
-        let cacheIndex = cache.items.findIndex((e) => e[1] === path);
+        let cacheIndex = folderCache.items.findIndex((e) => e[1] === path);
         if (cacheIndex !== -1) {
-            let e = cache.items[cacheIndex];
+            let e = folderCache.items[cacheIndex];
             setDirSize(e[0]);
             setFolder(e[2]);
             setReadyToSelect(true);
@@ -127,7 +127,7 @@ function App() {
     function pathOnClick(path: Path) {
         setState(State.None);
         setFolder(None);
-        setCache((prev) => {
+        setFolderCache((prev) => {
             prev.items.length = 0;
             return prev;
         });
@@ -137,13 +137,13 @@ function App() {
     useEffect(() => {
         listen("folder", (ev) => {
             let e = ev.payload as Folder;
-            if (cache.items.length === 5) {
-                setCache((prev) => {
+            if (folderCache.items.length === 5) {
+                setFolderCache((prev) => {
                     prev.items.shift();
                     return prev;
                 });
             }
-            setCache((prev) => {
+            setFolderCache((prev) => {
                 prev.items.push([e.size, e.root, e]);
                 return prev;
             });
@@ -259,17 +259,7 @@ function App() {
                             }}
                             series={[
                                 {
-                                    data: folder.entries
-                                        .map((node, i) => {
-                                            if (i > 9) return;
-                                            return {
-                                                id: i,
-                                                value: node[0],
-                                                label: fileName(node[1]),
-                                                color: node[2] ? "rgb(39, 39, 42)" : "rgb(113, 113, 122)",
-                                            };
-                                        })
-                                        .slice(0, 10) as { id: number; value: number; color: string; label: string }[],
+                                    data: pieData(folder, pieCache, setPieCache),
                                     valueFormatter: (v) => {
                                         let s = convertSize(v.value);
                                         return `${s[0]}${s[1]}`;

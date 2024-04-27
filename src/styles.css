@@ -12,6 +12,7 @@
     background-color: black;
     cursor: default;
     user-select: none;
+    overflow: hidden;
 
     font-synthesis: none;
     text-rendering: optimizeLegibility;
