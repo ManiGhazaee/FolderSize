@@ -2,9 +2,9 @@
 name = "folder_size"
 version = "0.0.0"
 description = "Folder Size"
-authors = ["you"]
-license = ""
-repository = ""
+authors = ["ManiGhazaee <hosseinghazaee1@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/ManiGhazaee/FolderSize"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

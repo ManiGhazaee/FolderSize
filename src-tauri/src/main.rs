@@ -3,7 +3,6 @@
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
-    time::Instant,
 };
 
 use folder_size::{open, Details, Folder, FolderSize, MAP};
@@ -11,12 +10,8 @@ use tauri::{Manager, Runtime};
 
 #[tauri::command]
 async fn folder_size<R: Runtime>(window: tauri::Window<R>, path: String) -> u64 {
-    let inst = Instant::now();
-
     let path_buf = Path::new(&path).to_path_buf();
     let size = FolderSize::run(path_buf, window);
-
-    dbg!(inst.elapsed());
 
     size
 }
@@ -68,7 +63,12 @@ async fn details(path: String) -> Details {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![folder_size, reveal, search, details])
+        .invoke_handler(tauri::generate_handler![
+            folder_size,
+            reveal,
+            search,
+            details
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
