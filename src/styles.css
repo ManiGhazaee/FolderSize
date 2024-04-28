@@ -52,3 +52,7 @@
 .MuiChartsTooltip-cell {
     color: rgb(244 244 245) !important;
 }
+
+.MuiPieArc-root {
+    stroke: rgb(63, 63, 70) !important;
+}

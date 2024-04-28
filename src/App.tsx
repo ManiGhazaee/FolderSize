@@ -1,7 +1,7 @@
 import { open } from "@tauri-apps/api/dialog";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/tauri";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { convertFile, convertMatch, convertSize, fileName, isNone, isSome, pieData } from "./lib";
 import { window as tauriWindow } from "@tauri-apps/api";
 import FolderIcon from "@mui/icons-material/Folder";
@@ -13,7 +13,8 @@ import Path from "./components/Path";
 import { BarLoader } from "react-spinners";
 import Size from "./components/Size";
 import { Option, None } from "./lib";
-import { pieArcClasses, PieChart } from "@mui/x-charts/PieChart";
+
+const PieChart = lazy(() => import("./components/PieChart"));
 
 type Path = string;
 type Size = number;
@@ -257,40 +258,36 @@ function App() {
                 </div>
                 {isSome(folder) && state === State.Chart && (
                     <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
-                        <PieChart
-                            slotProps={{
-                                legend: { hidden: true },
-                            }}
-                            series={[
-                                {
-                                    data: pieData(folder, pieCache, setPieCache),
-                                    valueFormatter: (v) => {
-                                        let s = convertSize(v.value);
-                                        return `${s[0]}${s[1]}`;
+                        <Suspense>
+                            <PieChart
+                                slotProps={{
+                                    legend: { hidden: true },
+                                }}
+                                series={[
+                                    {
+                                        data: pieData(folder, pieCache, setPieCache),
+                                        valueFormatter: (v) => {
+                                            let s = convertSize(v.value);
+                                            return `${s[0]}${s[1]}`;
+                                        },
+                                        innerRadius: 0,
+                                        outerRadius: 240,
+                                        paddingAngle: 2,
+                                        cornerRadius: 5,
+                                        cx: 300,
+                                        cy: 300,
                                     },
-                                    innerRadius: 0,
-                                    outerRadius: 240,
-                                    paddingAngle: 2,
-                                    cornerRadius: 5,
-                                    cx: 300,
-                                    cy: 300,
-                                },
-                            ]}
-                            onItemClick={(_, __, item) => {
-                                if (item.id === "Other" || item.color !== "rgb(113, 113, 122)") {
-                                    return;
-                                }
-                                folderSize(item.id as string);
-                            }}
-                            sx={{
-                                [`& .${pieArcClasses.root}`]: {
-                                    fill: "black",
-                                    stroke: "rgb(63, 63, 70)",
-                                },
-                            }}
-                            width={600}
-                            height={600}
-                        />
+                                ]}
+                                onItemClick={(_, __, item) => {
+                                    if (item.id === "Other" || item.color !== "rgb(113, 113, 122)") {
+                                        return;
+                                    }
+                                    folderSize(item.id as string);
+                                }}
+                                width={600}
+                                height={600}
+                            />
+                        </Suspense>
                     </div>
                 )}
                 {isSome(searchMatches) && (
