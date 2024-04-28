@@ -147,3 +147,66 @@ export function pieData(
     });
     return res;
 }
+
+function preventDefault(ev: KeyboardEvent) {
+    const ctrlKey = ev.ctrlKey;
+    const altKey = ev.altKey;
+    const shiftKey = ev.shiftKey;
+
+    switch (ev.key) {
+        case "B":
+        case "d":
+        case "f":
+        case "g":
+        case "h":
+        case "j":
+        case "k":
+        case "l":
+        case "L":
+        case "m":
+        case "M":
+        case "n":
+        case "N":
+        case "o":
+        case "O":
+        case "p":
+        case "P":
+        case "r":
+        case "R":
+        case "S":
+        case "t":
+        case "T":
+        case "u":
+        case "U":
+        case "v":
+        case "w":
+        case "W":
+        case "y":
+        case "0":
+            if (ctrlKey) {
+                ev.preventDefault();
+            }
+            break;
+        case "e":
+        case "I":
+            if (ctrlKey || altKey) {
+                ev.preventDefault();
+            }
+            break;
+        case "Enter":
+            if ((ctrlKey && shiftKey) || (altKey && shiftKey)) {
+                ev.preventDefault();
+            }
+            break;
+        case "Tab":
+            if (shiftKey) {
+                ev.preventDefault();
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+document.addEventListener("keydown", (ev) => preventDefault(ev));
+document.addEventListener("contextmenu", (ev) => ev.preventDefault());
